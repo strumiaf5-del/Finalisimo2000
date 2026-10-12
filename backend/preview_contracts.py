@@ -48,11 +48,17 @@ def _build_preview_params_model() -> type[BaseModel]:
         if name in excluded or parameter.kind in (inspect.Parameter.VAR_KEYWORD, inspect.Parameter.VAR_POSITIONAL):
             continue
         default = parameter.default
+        if parameter.annotation is not inspect.Parameter.empty:
+            annotation = parameter.annotation
+        elif default is inspect.Parameter.empty:
+            annotation = Any
+        else:
+            annotation = _annotation_from_default(default)
+
         if default is inspect.Parameter.empty:
-            annotation = parameter.annotation if parameter.annotation is not inspect.Parameter.empty else Any
             fields[name] = (annotation, ...)
         else:
-            fields[name] = (_annotation_from_default(default), default)
+            fields[name] = (annotation, default)
 
     class _Base(BaseModel):
         model_config = ConfigDict(extra="forbid", validate_assignment=True)

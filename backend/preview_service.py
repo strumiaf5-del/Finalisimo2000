@@ -96,12 +96,25 @@ class PreviewRenderer:
         self.renders_dir.mkdir(parents=True, exist_ok=True)
         self.duration_sec = duration_sec
         self.ttl_sec = ttl_sec
-        # Progreso del render en curso, por source_id. Vive en un Manager
-        # (proceso propio de multiprocessing) para que sea picklable y
-        # compartible con el proceso hijo `spawn` que hace el render real
-        # — un callback Python normal no se puede pasar a otro proceso.
-        self._progress_manager = mp.Manager()
-        self._progress = self._progress_manager.dict()
+        # El Manager de multiprocessing NO debe arrancarse al import del módulo:
+        # en Python 3.14 + CLI/uvicorn reload/embedded entorno puede romper el
+        # arranque de la app o del worker por ``forkserver``. Lo iniciamos sólo
+        # en el momento real de render, con fallback seguro para que el preview
+        # siga funcionando aunque el manager no pueda ponerse en marcha.
+        self._progress_manager = None
+        self._progress: dict[str, Any] = {}
+
+    def _ensure_progress_store(self) -> dict[str, Any]:
+        if self._progress_manager is not None:
+            return self._progress
+        try:
+            ctx = mp.get_context("fork" if os.name != "nt" else "spawn")
+            self._progress_manager = ctx.Manager()
+            self._progress = self._progress_manager.dict()
+        except (AttributeError, OSError, RuntimeError, ValueError):
+            self._progress_manager = None
+            self._progress = {}
+        return self._progress
 
     def cleanup(self) -> None:
         cutoff = time.time() - self.ttl_sec
@@ -347,11 +360,12 @@ class PreviewRenderer:
         source_id = Path(source_path).stem
         output_path = str(self.renders_dir / f"render-{uuid.uuid4().hex}.wav")
         meters_path = str(self._meters_path(source_id))
-        ctx = mp.get_context("spawn")
+        progress_store = self._ensure_progress_store()
+        ctx = mp.get_context("fork" if os.name != "nt" else "spawn")
         process = ctx.Process(
             target=self._render_worker,
             args=(source_path, output_path, meters_path, params, self.duration_sec,
-                  self._progress, source_id),
+                  progress_store, source_id),
             daemon=True,
         )
         process.start()

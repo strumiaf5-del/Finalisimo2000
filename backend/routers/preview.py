@@ -91,33 +91,15 @@ def create_preview_router(
     ):
         import logging as _lg
         _logger = _lg.getLogger("preview.params")
-        _debug_params = dict(payload.params) if hasattr(payload, 'params') and payload.params else {}
-        # BUGFIX debug Sep 11: mostramos TODOS los params distintos del default para
-        # diagnosticar distorsiones del frontend cuando manda valores zombi o agresivos.
-        # Comparamos contra defaults típicos del MasteringParams.
-        DEFAULTS = {
-            "input_gain_db": 0.0, "target_peak": 0.95, "target_lufs": -14.0,
-            "use_lufs_normalize": False, "oversample_mode": "quality",
-            "hp_cutoff": 80.0, "lp_bypass": True, "lp_cutoff": 18000.0,
-            "high_shelf_gain_db": 0.0, "low_shelf_gain_db": 0.0,
-            "comp_bypass": False, "comp_threshold_db": -18.0, "comp_ratio": 4.0,
-            "comp_attack_ms": 10.0, "comp_release_ms": 100.0, "comp_makeup_db": 0.0,
-            "limiter_bypass": False, "limiter_ceiling": 0.95,
-            "saturation_drive": 0.0, "saturation_mix": 1.0,
-            "stereo_bypass": False, "stereo_width_amount": 1.0,
-        }
-        non_default = {}
-        for k, v in sorted(_debug_params.items()):
-            if k in DEFAULTS:
-                dv = DEFAULTS[k]
-                if isinstance(dv, float) and isinstance(v,(int,float)):
-                    if abs(float(v) - dv) > 0.001:
-                        non_default[k] = {"got": v, "default": dv, "delta": round(float(v)-dv,3)}
-                elif v != dv:
-                    non_default[k] = {"got": v, "default": dv}
+        raw_params = payload.params.model_dump() if hasattr(payload, 'params') and payload.params else {}
+        # DEBUG NOTE: el payload no se está truncando en el backend. El log previo
+        # solo mostraba los keys distintos del default y daba la sensación de que
+        # sólo se enviaban 4 o 5 parámetros. Esto ahora registra el número total y
+        # la lista real de keys para depurar preview y GR sin confusión.
         _logger.info(
-            "render_preview NON_DEFAULT_KEYS count=%d keys=%s",
-            len(non_default), json.dumps(non_default, ensure_ascii=False, default=str),
+            "render_preview payload keys=%d first_keys=%s",
+            len(raw_params),
+            json.dumps(list(raw_params.keys())[:20], ensure_ascii=False),
         )
         try:
             source_path, meta = preview_renderer.get_source(
