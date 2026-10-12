@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'node:path';
 
+const backendTarget = process.env.BACKEND_PROXY_TARGET || 'https://ads-pie-showers-crucial.trycloudflare.com';
+
 export default defineConfig(({ command }) => ({
   root: resolve(__dirname),
   base: command === 'build' ? './' : '/',
@@ -37,33 +39,34 @@ export default defineConfig(({ command }) => ({
     strictPort: false,
     proxy: {
       '/api': {
-        target: 'https://ads-pie-showers-crucial.trycloudflare.com',
+        target: backendTarget,
         changeOrigin: true,
         secure: false,
+        ws: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
       '/auth': {
-        target: 'https://ads-pie-showers-crucial.trycloudflare.com',
+        target: backendTarget,
         changeOrigin: true,
         secure: false,
       },
       '/preview': {
-        target: 'https://ads-pie-showers-crucial.trycloudflare.com',
+        target: backendTarget,
         changeOrigin: true,
         secure: false,
       },
       '/jobs': {
-        target: 'https://ads-pie-showers-crucial.trycloudflare.com',
+        target: backendTarget,
         changeOrigin: true,
         secure: false,
       },
       '/projects': {
-        target: 'https://ads-pie-showers-crucial.trycloudflare.com',
+        target: backendTarget,
         changeOrigin: true,
         secure: false,
       },
       '/ws': {
-        target: 'wss://ads-pie-showers-crucial.trycloudflare.com',
+        target: backendTarget.replace(/^http/, 'ws'),
         ws: true,
         changeOrigin: true,
         secure: false,
